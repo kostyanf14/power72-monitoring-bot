@@ -1,10 +1,11 @@
 import asyncio
+import math
 import logging
-import threading
 from dataclasses import dataclass
 from typing import Any, Callable, Coroutine
 
 import RPi.GPIO as GPIO
+from ina219 import INA219
 
 from app.utils import SingletonMeta
 
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class StatusModel:
+class GPIOStatusModel:
     status: bool
     name: str
     gpio_port: int
@@ -43,16 +44,56 @@ class StatusModel:
 
 @dataclass
 class ATSStatus:
-    normal: StatusModel
-    standby: StatusModel
+    normal: GPIOStatusModel
+    standby: GPIOStatusModel
+
+
+@dataclass
+class VoltageStatus:
+    voltage: float
+    name: str
+    shunt_ohms: float
+    address: int
+
+    __ina: INA219
+    __reported_voltage: float
+
+    def __init__(self, voltage: float, name: str, shunt_ohms: float, address: int):
+        self.voltage = voltage
+        self.name = name
+        self.shunt_ohms = shunt_ohms
+        self.address = address
+
+        self.__ina = INA219(shunt_ohms, address=address)
+        self.__ina.configure()
+        self.__reported_voltage = 0
+
+    def percent(self) -> float:
+        a = 4.5
+        b = 1.3099
+        c = -13.3909
+        d = -6.8869
+        return a * math.exp(b * self.voltage + c) + d
+
+    def update_status(self) -> bool:
+        updated = False
+
+        voltage_status = self.__ina.voltage()
+        delta = self.__reported_voltage - ((self.voltage + voltage_status) / 2)
+        if abs(delta) > 0.1:
+            self.__reported_voltage = voltage_status
+            updated = True
+
+        self.voltage = voltage_status
+        return updated
 
 
 class Status(metaclass=SingletonMeta):
-    power_statuses: list[StatusModel]
+    power_statuses: list[GPIOStatusModel]
     ats_statuses: list[ATSStatus]
-    stop_sync_event: threading.Event
-    sync_thread: threading.Thread
+    voltage_statuses: list[VoltageStatus]
     on_update: Callable[[], Coroutine[Any, Any, None]]
+    __ina: INA219
 
     def init(self):
         logger.info("Initializing Status class")
@@ -60,20 +101,24 @@ class Status(metaclass=SingletonMeta):
         GPIO.setmode(GPIO.BCM)
 
         self.power_statuses = [
-            StatusModel(False, 'Network', 17, False),
-            StatusModel(False, 'Generator', 27, False),
-            StatusModel(False, 'Kitchen', 22, False),
+            GPIOStatusModel(False, 'Network', 22, False),
+            GPIOStatusModel(False, 'Generator', 27, False),
+            GPIOStatusModel(False, 'Kitchen', 17, False),
         ]
 
         self.ats_statuses = [
             ATSStatus(
-                StatusModel(False, "Network", 25, True),
-                StatusModel(False, "Generator", 24, True),
+                GPIOStatusModel(False, "Network", 25, True),
+                GPIOStatusModel(False, "Generator", 24, True),
             ),
             ATSStatus(
-                StatusModel(False, "NetworkInternal", 16, True),
-                StatusModel(False, "Battery", 23, True),
+                GPIOStatusModel(False, "NetworkInternal", 16, True),
+                GPIOStatusModel(False, "Battery", 23, True),
             )
+        ]
+
+        self.voltage_statuses = [
+            VoltageStatus(0, "Battery", 0.1, 0x40)
         ]
 
         for power in self.power_statuses:
@@ -82,6 +127,8 @@ class Status(metaclass=SingletonMeta):
         for ats in self.ats_statuses:
             GPIO.setup(ats.normal.gpio_port, GPIO.IN)
             GPIO.setup(ats.standby.gpio_port, GPIO.IN)
+
+        self.sync_status()
 
     def start_monitoring(self, on_update: Callable[[], Coroutine[Any, Any, None]]) -> None:
         logger.info("Starting monitoring")
@@ -99,6 +146,9 @@ class Status(metaclass=SingletonMeta):
         for ats in self.ats_statuses:
             updated |= ats.normal.update_status()
             updated |= ats.standby.update_status()
+
+        # for voltage in self.voltage_statuses:
+        #     updated |= voltage.update_status()
 
         return updated
 
@@ -134,6 +184,11 @@ class Status(metaclass=SingletonMeta):
                 lines.append(f"   ATS{ats_id + 1}       ❌")
             else:
                 lines.append(f"   ATS{ats_id + 1}       {enabled[0]}")
+
+        for v_id in range(len(self.voltage_statuses)):
+            voltage = self.voltage_statuses[v_id]
+            lines.append(f"   {voltage.name}       {voltage.voltage} (~{voltage.percent()}%)")
+
         lines.append('```')
         return "\n".join(lines)
 

@@ -1,0 +1,14 @@
+[Unit]
+  Description = Automation Service
+  After = network.target
+
+[Service]
+  User = alarm
+  Group = alarm
+  WorkingDirectory = /opt/power72-monitoring-bot
+  Environment = 'LOG_FILE=p72.log'
+  ExecStart = /opt/power72-monitoring-bot/venv/bin/python /opt/power72-monitoring-bot/main_bot.py
+  Restart = always
+
+[Install]
+  WantedBy = multi-user.target
