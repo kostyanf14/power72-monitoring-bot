@@ -1,0 +1,18 @@
+name: Run pyright
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Installing python dependency
+        run: pip install -r requirements.dev.txt
+      - uses: jakebailey/pyright-action@v1

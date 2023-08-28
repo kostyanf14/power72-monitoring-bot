@@ -1,0 +1,22 @@
+name: Run isort
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  isort:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Installing python dependency
+        run: pip install -r requirements.dev.txt
+      - uses: isort/isort-action@master
+        with:
+            requirementsFiles: "requirements.dev.txt"

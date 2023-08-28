@@ -1,0 +1,7 @@
+-r requirements.runtime.txt
+flake8
+pytest
+pytest-mypy
+pytest-isort
+pyright
+git+https://github.com/nosix/raspberry-gpio-emulator/

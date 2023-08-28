@@ -1,1 +1,1 @@
-# power-monitoring-bot
+# power72-monitoring-bot
