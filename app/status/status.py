@@ -68,7 +68,7 @@ class VoltageStatus:
     def update_status(self) -> bool:
         updated = False
 
-        voltage_status = self.__ina.voltage()
+        voltage_status = round(self.__ina.voltage(), 1)
         if self.voltage != voltage_status:
             updated = True
             self.voltage = voltage_status
