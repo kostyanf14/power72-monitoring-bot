@@ -71,8 +71,8 @@ class VoltageStatus:
         voltage_status = self.__ina.voltage()
         if abs(round(self.voltage, 1) - round(voltage_status, 1)) > 0.1:
             updated = True
-            self.voltage = voltage_status
 
+        self.voltage = voltage_status
         return updated
 
 
