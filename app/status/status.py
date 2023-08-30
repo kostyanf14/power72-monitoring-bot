@@ -69,7 +69,7 @@ class VoltageStatus:
         updated = False
 
         voltage_status = self.__ina.voltage()
-        if abs(round(self.voltage, 1) - round(voltage_status, 1)) > 0.1:
+        if abs(self.voltage - voltage_status) > 0.1:
             updated = True
 
         self.voltage = voltage_status
@@ -89,9 +89,9 @@ class Status(metaclass=SingletonMeta):
         GPIO.setmode(GPIO.BCM)
 
         self.power_statuses = [
-            GPIOStatusModel(False, 'Network', 17, False),
+            GPIOStatusModel(False, 'Network', 22, False),
             GPIOStatusModel(False, 'Generator', 27, False),
-            GPIOStatusModel(False, 'Kitchen', 22, False),
+            GPIOStatusModel(False, 'Kitchen', 17, False),
         ]
 
         self.ats_statuses = [
