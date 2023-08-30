@@ -55,6 +55,7 @@ class VoltageStatus:
     address: int
 
     __ina: INA219
+    __reported_voltage: float
 
     def __init__(self, voltage: float, name: str, shunt_ohms: float, address: int):
         self.voltage = voltage
@@ -64,12 +65,14 @@ class VoltageStatus:
 
         self.__ina = INA219(shunt_ohms, address=address)
         self.__ina.configure()
+        self.__reported_voltage = 0
 
     def update_status(self) -> bool:
         updated = False
 
         voltage_status = self.__ina.voltage()
-        if abs(self.voltage - voltage_status) > 0.1:
+        if abs(self.__reported_voltage - voltage_status) > 0.1:
+            self.__reported_voltage = voltage_status
             updated = True
 
         self.voltage = voltage_status
