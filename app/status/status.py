@@ -71,7 +71,8 @@ class VoltageStatus:
         updated = False
 
         voltage_status = self.__ina.voltage()
-        if abs(self.__reported_voltage - voltage_status) > 0.1:
+        delta = self.__reported_voltage - ((self.voltage + voltage_status) / 2)
+        if abs(delta) > 0.1:
             self.__reported_voltage = voltage_status
             updated = True
 
