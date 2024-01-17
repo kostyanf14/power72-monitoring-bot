@@ -15,4 +15,4 @@ jobs:
           cache: 'pip'
       - name: Installing python dependency
         run: pip install -r requirements.dev.txt
-      - uses: jakebailey/pyright-action@v1
+      - uses: jakebailey/pyright-action@v2
