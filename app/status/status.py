@@ -147,8 +147,8 @@ class Status(metaclass=SingletonMeta):
             updated |= ats.normal.update_status()
             updated |= ats.standby.update_status()
 
-        # for voltage in self.voltage_statuses:
-        #     updated |= voltage.update_status()
+        for voltage in self.voltage_statuses:
+            updated |= voltage.update_status()
 
         return updated
 
