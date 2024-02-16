@@ -66,7 +66,7 @@ class VoltageStatus:
 
         self.__ina = INA219(shunt_ohms, busnum=0x1, address=address)
         self.__ina.configure()
-        self.__reported_voltage = 0
+        self.__reported_voltage_percent = 0
 
     def percent(self) -> float:
         a = 4.5
