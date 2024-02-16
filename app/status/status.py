@@ -56,7 +56,7 @@ class VoltageStatus:
     address: int
 
     __ina: INA219
-    __reported_voltage: float
+    __reported_voltage_percent: float
 
     def __init__(self, voltage: float, name: str, shunt_ohms: float, address: int):
         self.voltage = voltage
