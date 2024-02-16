@@ -70,9 +70,10 @@ class VoltageStatus:
 
     def percent(self) -> float:
         a = 4.5
-        # b = 1.3099
-        b = 0.1728
-        c = - 1.2358 - math.log(a, math.e)
+        b = 1.3099
+        #b = 0.1728
+        c = -13.3909
+        #c = - 1.2358 - math.log(a, math.e)
         d = -6.8869
         return a * math.exp(b * self.voltage + c) + d
 
