@@ -64,7 +64,7 @@ class VoltageStatus:
         self.shunt_ohms = shunt_ohms
         self.address = address
 
-        self.__ina = INA219(shunt_ohms, address=address)
+        self.__ina = INA219(shunt_ohms, busnum=0x1, address=address)
         self.__ina.configure()
         self.__reported_voltage = 0
 
