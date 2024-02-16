@@ -70,8 +70,9 @@ class VoltageStatus:
 
     def percent(self) -> float:
         a = 4.5
-        b = 1.3099
-        c = -13.3909
+        # b = 1.3099
+        b = 0.1728
+        c = - 1.2358 - math.log(a, math.exp)
         d = -6.8869
         return a * math.exp(b * self.voltage + c) + d
 
@@ -79,12 +80,13 @@ class VoltageStatus:
         updated = False
 
         voltage_status = self.__ina.voltage()
-        delta = self.__reported_voltage - ((self.voltage + voltage_status) / 2)
-        if abs(delta) > 0.1:
-            self.__reported_voltage = voltage_status
+        self.voltage = voltage_status
+
+        delta = self.__reported_voltage_percent - self.percent()
+        if abs(delta) > 15:
+            self.__reported_voltage_percent = self.percent()
             updated = True
 
-        self.voltage = voltage_status
         return updated
 
 
