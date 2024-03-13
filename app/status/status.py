@@ -107,8 +107,8 @@ class Status(metaclass=SingletonMeta):
 
         self.power_statuses = [
             GPIOStatusModel(False, 'Network', 22, False),
-            GPIOStatusModel(False, 'Generator', 27, False),
-            GPIOStatusModel(False, 'Kitchen', 17, False),
+            GPIOStatusModel(False, 'Generator', 17, False),
+            GPIOStatusModel(False, 'Kitchen', 27, False),
         ]
 
         self.ats_statuses = [
