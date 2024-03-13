@@ -1,3 +1,5 @@
+import time
+import requests
 from app.bot import Bot
 from app.config import Config
 from app.status import Status
@@ -16,5 +18,14 @@ def exit_bot():
 
 
 if __name__ == '__main__':
+    for i in range(5):
+        try:
+            response = requests.get("https://1.1.1.1", timeout=60)
+            print("The Internet is connected.")
+            break
+        except requests.ConnectionError:
+            print("The Internet is not connected. Waiting 60 seconds to try again.")
+            time.sleep(60)
+
     main_bot()
     exit_bot()
