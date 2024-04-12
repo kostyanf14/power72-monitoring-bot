@@ -1,4 +1,4 @@
 python-dotenv==1.0.1
-python-telegram-bot==20.6
+python-telegram-bot==21.1
 pi-ina219==1.4.1
 requests==2.31.0
