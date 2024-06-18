@@ -241,7 +241,7 @@ class Status(metaclass=SingletonMeta):
 
         for v_id in range(len(self.voltage_statuses)):
             voltage = self.voltage_statuses[v_id]
-            lines.append(f"   {voltage.name}       {voltage.voltage} (~{voltage.percent()}%)")
+            lines.append(f"   {voltage.name:12}  {voltage.voltage} (~{voltage.percent()}%)")
 
         lines.append('```')
         return "\n".join(lines)
