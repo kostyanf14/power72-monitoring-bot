@@ -49,7 +49,7 @@ class ATSStatus:
 
 
 @dataclass
-class VoltageStatus:
+class Voltage219Status:
     voltage: float
     name: str
     shunt_ohms: float
@@ -92,7 +92,7 @@ class VoltageStatus:
 class Status(metaclass=SingletonMeta):
     power_statuses: list[GPIOStatusModel]
     ats_statuses: list[ATSStatus]
-    voltage_statuses: list[VoltageStatus]
+    voltage_statuses: list[Voltage219Status]
     on_update: Callable[[], Coroutine[Any, Any, None]]
     __ina: INA219
 
@@ -119,7 +119,7 @@ class Status(metaclass=SingletonMeta):
         ]
 
         self.voltage_statuses = [
-            VoltageStatus(0, "Battery", 0.1, 0x40)
+            Voltage219Status(0, "Battery", 0.1, 0x40)
         ]
 
         for power in self.power_statuses:
