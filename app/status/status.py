@@ -1,4 +1,6 @@
 import asyncio
+from datetime import datetime
+import json
 import math
 import logging
 from dataclasses import dataclass
@@ -88,13 +90,63 @@ class Voltage219Status:
 
         return updated
 
+@dataclass
+class VoltageJSONStatus:
+    voltage: float
+    name: str
+    file_name: str
+    field_name: str
+    min_voltage: float
+    max_voltage: float
+
+
+    __reported_voltage_percent: float
+
+    def __init__(self, voltage: float, name: str, file_name: str, field_name: str, min_voltage: float, max_voltage: float):
+        self.voltage = voltage
+        self.name = name
+        self.file_name = file_name
+        self.field_name = field_name
+
+        self.min_voltage = min_voltage
+        self.max_voltage = max_voltage
+
+        self.__reported_voltage_percent = 0
+
+    def percent(self) -> float:
+        return 100.0 * (self.voltage - self.min_voltage) / (self.max_voltage - self.min_voltage)
+
+    def update_status(self) -> bool:
+        updated = False
+
+        voltage_status = 0
+        try:
+            with open(self.file_name, "r") as file:
+                data = json.load(file)
+                json_time = data['Timestamp']
+                timestamp = datetime.utcfromtimestamp(json_time)
+                voltage_status = data[self.field_name]
+
+                logger.debug("Timestamp: %s, Voltage: %s", timestamp, voltage_status)
+        except Exception as e:
+            logger.error("Error reading file %s: %s", self.file_name, e)
+            return False
+
+        self.voltage = voltage_status
+
+        delta = self.__reported_voltage_percent - self.percent()
+        if abs(delta) > 10:
+            self.__reported_voltage_percent = self.percent()
+            updated = True
+
+        return updated
+
 
 class Status(metaclass=SingletonMeta):
     power_statuses: list[GPIOStatusModel]
     ats_statuses: list[ATSStatus]
     voltage_statuses: list[Voltage219Status]
     on_update: Callable[[], Coroutine[Any, Any, None]]
-    __ina: INA219
 
     def init(self):
         logger.info("Initializing Status class")
@@ -119,7 +171,8 @@ class Status(metaclass=SingletonMeta):
         ]
 
         self.voltage_statuses = [
-            Voltage219Status(0, "Battery", 0.1, 0x40)
+            Voltage219Status(0, "Battery", 0.1, 0x40),
+            VoltageJSONStatus(0, "Inverter", "/tmp/inverter.json", "Battery_voltage", 21.0, 28.3),
         ]
 
         for power in self.power_statuses:
