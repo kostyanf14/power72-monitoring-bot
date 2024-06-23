@@ -172,7 +172,7 @@ class Status(metaclass=SingletonMeta):
 
         self.voltage_statuses = [
             Voltage219Status(0, "Battery", 0.1, 0x40),
-            VoltageJSONStatus(0, "Inverter", "/tmp/inverter.json", "Battery_voltage", 21.0, 28.3),
+            VoltageJSONStatus(0, "Inverter", "/tmp/inverter.json", "Battery_voltage", 21.7, 28.7),
         ]
 
         for power in self.power_statuses:
