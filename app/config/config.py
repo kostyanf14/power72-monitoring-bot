@@ -9,6 +9,7 @@ from .utils import getenv, getenv_typed
 
 class Config:
     production: bool
+    environment: str
     log_directory: str
     log_file: str
     log_level: str
@@ -27,6 +28,7 @@ class Config:
         Config.__load_dotenv()
 
         Config.production = getenv('PY_ENVIRONMENT', 'development') == 'production'
+        Config.environment = getenv('PY_ENVIRONMENT', 'development')
         Config.log_directory = getenv('LOG_DIR')
         Config.log_file = getenv('LOG_FILE')
         Config.log_level = getenv('LOG_LEVEL', 'DEBUG')
