@@ -60,10 +60,10 @@ class JSONStatus:
         return False
 
     def _value_changed(self, j_field: JSONField) -> bool:
-        if j_field.value != self.last_reported_value[j_field.name]:
-            if j_field.have_percent:
-                return self._percent_changed(j_field)
+        if j_field.have_percent:
+            return self._percent_changed(j_field)
 
+        if j_field.value != self.last_reported_value[j_field.name]:
             if j_field.report_on_change_value is not None:
                 if abs(j_field.value - self.last_reported_value[j_field.name]) >= j_field.report_on_change_value:
                     logger.debug("Field %s changed to %s and reported", j_field.name, j_field.value)
@@ -74,6 +74,10 @@ class JSONStatus:
                 return False
 
             if j_field.value != self.last_reported_value[j_field.name]:
+                if not j_field.report_on_change:
+                    logger.debug("Field %s changed to %s but not reported", j_field.name, j_field.value)
+                    return False
+
                 self.last_reported_value[j_field.name] = j_field.value
                 logger.debug("Field %s changed to %s and reported", j_field.name, j_field.value)
                 return True
