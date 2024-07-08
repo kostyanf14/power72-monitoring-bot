@@ -1,53 +1,21 @@
 import asyncio
-from datetime import datetime
 import json
-import math
 import logging
+import math
+from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Callable, Coroutine
 
 import RPi.GPIO as GPIO
 from ina219 import INA219
 
+from app.status.ats_status import ATSStatus
+from app.status.gpio_status import GPIOStatus
+from app.status.json_status import JSONField, JSONStatus
 from app.utils import SingletonMeta
 
 logger = logging.getLogger(__name__)
-# 220 фіолетовий/сірий жовтий 5в11 GPIO25
-# Генератор жовтий/помаранчевий коричневий 5в9 GPIO24
-# 2202 синій/зелений помаранчевий 33в16 GPIO16
-# УПС помаранчевий/жовтий рожевий 5в8 GPIO23
-
-# 220v -> 17
-# 220v -> 27
-# 220v -> 22
-
-
-@dataclass
-class GPIOStatusModel:
-    status: bool
-    name: str
-    gpio_port: int
-    gpio_hight_mode: bool
-
-    def update_status(self) -> bool:
-        updated = False
-
-        next_status = GPIO.input(self.gpio_port)
-        if self.status != next_status:
-            updated = True
-            self.status = next_status
-
-        return updated
-
-    @property
-    def fixed_status(self):
-        return self.status if self.gpio_hight_mode else not self.status
-
-
-@dataclass
-class ATSStatus:
-    normal: GPIOStatusModel
-    standby: GPIOStatusModel
 
 
 @dataclass
@@ -90,6 +58,7 @@ class Voltage219Status:
 
         return updated
 
+
 @dataclass
 class VoltageJSONStatus:
     voltage: float
@@ -98,7 +67,6 @@ class VoltageJSONStatus:
     field_name: str
     min_voltage: float
     max_voltage: float
-
 
     __reported_voltage_percent: float
 
@@ -141,46 +109,136 @@ class VoltageJSONStatus:
 
         return updated
 
+    def str_status(self) -> str:
+        return f"{self.voltage} (~{self.percent()}%)"
+
 
 class Status(metaclass=SingletonMeta):
-    power_statuses: list[GPIOStatusModel]
-    ats_statuses: list[ATSStatus]
-    voltage_statuses: list[Voltage219Status]
+    statuses: dict[str, list[Any]]
     on_update: Callable[[], Coroutine[Any, Any, None]]
 
-    def init(self):
+    def _create_gpio_status(self, status: dict):
+        port = status.get("gpio_port")
+        if port is None:
+            raise ValueError("Can't create GPIO Status: gpio_port is not defined")
+
+        if not isinstance(port, int):
+            raise ValueError("Can't create GPIO Status: gpio_port is not int")
+
+        GPIO.setup(port, GPIO.IN)
+
+        return GPIOStatus(
+            bool(status.get("initial")),
+            str(status.get("name")),
+            port,
+            bool(status.get("gpio_hight_mode")),
+            bool(status.get("report_on_change"))
+        )
+
+    def _create_ats_status(self, status: dict):
+        status1_content = status.get("status1")
+        status2_content = status.get("status2")
+        if status1_content is None:
+            logger.error("Cannot create ats status, status1 is not defined.")
+            return None
+
+        if status2_content is None:
+            logger.error("Cannot create ats status, status2 is not defined.")
+            return None
+
+        status1 = self._create_status(status1_content)
+        if status1 is None:
+            logger.error("Cannot create status1, ats status is invalid.")
+            return None
+
+        status2 = self._create_status(status2_content)
+        if status2 is None:
+            logger.error("Cannot create status2, ats status is invalid.")
+            return None
+
+        name = status.get("name")
+        if name is None:
+            logger.error("Cannot create ats status, name is not defined.")
+            return None
+
+        return ATSStatus(name, status1, status2)
+
+    def _create_json_field(self, field: dict):
+        return JSONField(
+            str(field.get("name")),
+            str(field.get("field")),
+            field.get("value"),
+            str(field.get("unit")),
+            bool(field.get("report_on_change")),
+            field.get("report_on_change_value", None),
+            bool(field.get("have_percent", False)),
+            field.get("percent_min", None),
+            field.get("percent_max", None),
+            bool(field.get("report_on_percent", False))
+        )
+
+    def _create_json_status(self, status: dict):
+        fields = status.get("fields")
+        path = status.get("file_path")
+        if fields is None:
+            raise ValueError("Can't create JSON Status: fields are not defined")
+
+        if path is None:
+            raise ValueError("Can't create JSON Status: file_path is not defined")
+
+        return JSONStatus(
+            path,
+            list(map(lambda field: self._create_json_field(field), fields))
+        )
+
+    def _create_status(self, status: dict):
+        type_data = status.get("type")
+        if type_data is None:
+            raise ValueError("Status type is not defined")
+
+        status_type = type_data.lower()
+        match status_type:
+            case "gpio":
+                value = self._create_gpio_status(status)
+            case "ats":
+                value = self._create_ats_status(status)
+            case "json":
+                value = self._create_json_status(status)
+            case _:
+                value = None
+
+        if value is None:
+            logger.error("Failed to create status with type %s", status_type)
+
+        return value
+
+    def parse_config(self, config_path: str):
+        config_data = json.load(open(config_path, "r"))
+        self.statuses = defaultdict(list)
+        self.statuses_fail = []
+
+        statuses_list = config_data.get("statuses", [])
+        for status in statuses_list:
+            value = self._create_status(status)
+
+            if value is None:
+                self.statuses_fail.append(status.get("name"))
+            else:
+                self.statuses[status.get("group")].append(value)
+
+    def init(self, config_path: str):
         logger.info("Initializing Status class")
 
         GPIO.setmode(GPIO.BCM)
 
-        self.power_statuses = [
-            GPIOStatusModel(False, 'Network', 22, False),
-            GPIOStatusModel(False, 'Generator', 17, False),
-            GPIOStatusModel(False, 'Kitchen', 27, False),
-        ]
+        self.parse_config(config_path)
 
-        self.ats_statuses = [
-            ATSStatus(
-                GPIOStatusModel(False, "Network", 25, True),
-                GPIOStatusModel(False, "Generator", 24, True),
-            ),
-            ATSStatus(
-                GPIOStatusModel(False, "NetworkInternal", 16, True),
-                GPIOStatusModel(False, "Battery", 23, True),
-            )
-        ]
+        return
 
         self.voltage_statuses = [
             Voltage219Status(0, "Battery", 0.1, 0x40),
             VoltageJSONStatus(0, "Inverter", "/tmp/inverter.json", "Battery_voltage", 21.7, 28.7),
         ]
-
-        for power in self.power_statuses:
-            GPIO.setup(power.gpio_port, GPIO.IN)
-
-        for ats in self.ats_statuses:
-            GPIO.setup(ats.normal.gpio_port, GPIO.IN)
-            GPIO.setup(ats.standby.gpio_port, GPIO.IN)
 
         self.sync_status()
 
@@ -194,15 +252,9 @@ class Status(metaclass=SingletonMeta):
         logger.debug("Syncing status")
         updated = False
 
-        for power in self.power_statuses:
-            updated |= power.update_status()
-
-        for ats in self.ats_statuses:
-            updated |= ats.normal.update_status()
-            updated |= ats.standby.update_status()
-
-        for voltage in self.voltage_statuses:
-            updated |= voltage.update_status()
+        for _, statuses in self.statuses.items():
+            for status in statuses:
+                updated |= status.update_status()
 
         return updated
 
@@ -218,30 +270,21 @@ class Status(metaclass=SingletonMeta):
         lines = []
 
         lines.append('```')
-        lines.append("Power ⚡️")
-        for power_id in range(len(self.power_statuses)):
-            power = self.power_statuses[power_id]
-            lines.append(f"   {power.name:10} {'✅' if power.fixed_status else '❌'}")
 
-        lines.append("Status:")
-        for ats_id in range(len(self.ats_statuses)):
-            ats = self.ats_statuses[ats_id]
-            enabled = []
-            if ats.normal.fixed_status:
-                enabled.append(ats.normal.name)
-            if ats.standby.fixed_status:
-                enabled.append(ats.standby.name)
+        for group, statuses in self.statuses.items():
+            lines.append(group)
+            for status in statuses:
+                for name, value in status.text_status():
+                    lines.append(f"   {name:10}   {value}")
 
-            if len(enabled) == 2:
-                lines.append(f"   ATS{ats_id + 1}       ❌*{enabled[0]} & {enabled[1]}*❌")
-            elif len(enabled) == 0:
-                lines.append(f"   ATS{ats_id + 1}       ❌")
-            else:
-                lines.append(f"   ATS{ats_id + 1}       {enabled[0]}")
+        # for v_id in range(len(self.voltage_statuses)):
+        #     voltage = self.voltage_statuses[v_id]
+        #     lines.append(f"   {voltage.name:12}  {voltage.voltage} (~{voltage.percent()}%)")
 
-        for v_id in range(len(self.voltage_statuses)):
-            voltage = self.voltage_statuses[v_id]
-            lines.append(f"   {voltage.name:12}  {voltage.voltage} (~{voltage.percent()}%)")
+        if self.statuses_fail.__len__() > 0:
+            lines.append("Failed to create statuses:")
+            for status in self.statuses_fail:
+                lines.append(f"   {status}")
 
         lines.append('```')
         return "\n".join(lines)
