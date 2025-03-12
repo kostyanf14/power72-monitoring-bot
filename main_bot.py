@@ -9,8 +9,8 @@ from app.config import Config
 from app.status import Status
 
 
-async def print_status():
-    print(Status().generate_status_msg())
+async def print_status(triggered_by: list[str]):
+    print(Status().generate_status_msg(triggered_by))
 
 
 def main_bot():

@@ -36,10 +36,10 @@ class Bot(metaclass=SingletonMeta):
         logger.debug("Registering error handlers")
         self.application.add_error_handler(handlers.error_handler)
 
-    async def send_status_update(self) -> None:
+    async def send_status_update(self, triggered_by: list[str]) -> None:
         logger.info("Sending status update")
 
-        msg = Status().generate_status_msg()
+        msg = Status().generate_status_msg(triggered_by)
         for chat_id in Config.notify_chat_ids:
             await self.application.bot.sendMessage(chat_id=chat_id, text=msg, parse_mode=ParseMode.MARKDOWN_V2)
 

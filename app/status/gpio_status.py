@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Tuple
 
 import RPi.GPIO as GPIO
 
@@ -11,7 +12,7 @@ class GPIOStatus:
     gpio_hight_mode: bool
     report_on_change: bool
 
-    def update_status(self) -> bool:
+    def update_status(self) -> Tuple[bool, list[str]]:
         updated = False
 
         next_status = GPIO.input(self.gpio_port)
@@ -20,7 +21,9 @@ class GPIOStatus:
             if self.report_on_change:
                 updated = True
 
-        return updated
+        if updated:
+            return (updated, [self.name])
+        return (updated, [])
 
     def text_status(self) -> list[tuple[str, str]]:
         return [(self.name, '✅' if self.fixed_status else '❌')]

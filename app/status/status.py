@@ -5,7 +5,7 @@ import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, Tuple
 
 import RPi.GPIO as GPIO
 from ina219 import INA219
@@ -45,7 +45,7 @@ class Voltage219Status:
 
         return max(-1, 100 - math.exp(a - 5 * self.voltage) - math.exp(b - 3 * self.voltage) - math.exp(c-self.voltage))
 
-    def update_status(self) -> bool:
+    def update_status(self) -> Tuple[bool, list[str]]:
         updated = False
 
         voltage_status = self.__ina.voltage()
@@ -56,7 +56,7 @@ class Voltage219Status:
             self.__reported_voltage_percent = self.percent()
             updated = True
 
-        return updated
+        return (updated, [])
 
 
 @dataclass
@@ -84,7 +84,7 @@ class VoltageJSONStatus:
     def percent(self) -> float:
         return 100.0 * (self.voltage - self.min_voltage) / (self.max_voltage - self.min_voltage)
 
-    def update_status(self) -> bool:
+    def update_status(self) -> Tuple[bool, list[str]]:
         updated = False
 
         voltage_status = 0
@@ -98,7 +98,7 @@ class VoltageJSONStatus:
                 logger.debug("Timestamp: %s, Voltage: %s", timestamp, voltage_status)
         except Exception as e:
             logger.error("Error reading file %s: %s", self.file_name, e)
-            return False
+            return (False, [])
 
         self.voltage = voltage_status
 
@@ -107,7 +107,7 @@ class VoltageJSONStatus:
             self.__reported_voltage_percent = self.percent()
             updated = True
 
-        return updated
+        return (updated, [])
 
     def str_status(self) -> str:
         return f"{self.voltage} (~{self.percent()}%)"
@@ -115,7 +115,7 @@ class VoltageJSONStatus:
 
 class Status(metaclass=SingletonMeta):
     statuses: dict[str, list[Any]]
-    on_update: Callable[[], Coroutine[Any, Any, None]]
+    on_update: Callable[[list[str]], Coroutine[Any, Any, None]]
 
     def _create_gpio_status(self, status: dict):
         port = status.get("gpio_port")
@@ -242,21 +242,24 @@ class Status(metaclass=SingletonMeta):
 
         self.sync_status()
 
-    def start_monitoring(self, on_update: Callable[[], Coroutine[Any, Any, None]]) -> None:
+    def start_monitoring(self, on_update: Callable[[list[str]], Coroutine[Any, Any, None]]) -> None:
         logger.info("Starting monitoring")
         loop = asyncio.get_event_loop()
         loop.create_task(self.__sync_status())
         self.on_update = on_update
 
-    def sync_status(self) -> bool:
+    def sync_status(self) -> Tuple[bool, list[str]]:
         logger.debug("Syncing status")
         updated = False
+        triggered_by = []
 
         for _, statuses in self.statuses.items():
             for status in statuses:
-                updated |= status.update_status()
+                upd, trd = status.update_status()
+                updated |= upd
+                triggered_by.extend(trd)
 
-        return updated
+        return (updated, triggered_by)
 
     # Power ⚡️
     #   Main        ✅
@@ -266,7 +269,7 @@ class Status(metaclass=SingletonMeta):
     #   ATS1        Generator
     #   ATS2        Battery
     #   Battery     12.3v (~90%)
-    def generate_status_msg(self) -> str:
+    def generate_status_msg(self, triggered_by: list[str]) -> str:
         lines = []
 
         lines.append('```')
@@ -281,6 +284,9 @@ class Status(metaclass=SingletonMeta):
         #     voltage = self.voltage_statuses[v_id]
         #     lines.append(f"   {voltage.name:12}  {voltage.voltage} (~{voltage.percent()}%)")
 
+        if triggered_by.__len__() > 0:
+            lines.append(f"Triggered by: {triggered_by}")
+
         if self.statuses_fail.__len__() > 0:
             lines.append("Failed to create statuses:")
             for status in self.statuses_fail:
@@ -291,9 +297,10 @@ class Status(metaclass=SingletonMeta):
 
     async def __sync_status(self):
         while True:
-            if self.sync_status():
+            upd, trb = self.sync_status()
+            if upd:
                 try:
-                    await self.on_update()
+                    await self.on_update(trb)
                 except Exception as err:
                     logger.error("Error during on_update(): %s", err)
             await asyncio.sleep(5)

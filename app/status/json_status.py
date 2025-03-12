@@ -1,7 +1,7 @@
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +90,9 @@ class JSONStatus:
         logger.debug("Field %s not changed", j_field.name)
         return False
 
-    def update_status(self) -> bool:
+    def update_status(self) -> Tuple[bool, list[str]]:
         updated = False
+        triggered_by = []
 
         try:
             with open(self.file_path, "r") as file:
@@ -101,15 +102,17 @@ class JSONStatus:
                     if j_field.field in data:
                         if j_field.value != data[j_field.field]:
                             j_field.value = data[j_field.field]
-                            updated |= self._value_changed(j_field)
+                            if self._value_changed(j_field):
+                                updated = True
+                                triggered_by.append(j_field.name)
                     else:
                         logger.error("Field %s not found in file %s", j_field.field, self.file_path)
 
         except Exception as e:
             logger.error("Error reading file %s: %s", self.file_path, e)
-            return False
+            return (False, [])
 
-        return updated
+        return (updated, triggered_by)
 
     def text_status(self) -> list[tuple[str, str]]:
         status = []
