@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Tuple
 
 from app.status.gpio_status import GPIOStatus
 
@@ -9,13 +10,21 @@ class ATSStatus:
     normal: GPIOStatus
     standby: GPIOStatus
 
-    def update_status(self) -> bool:
+    def update_status(self) -> Tuple[bool, list[str]]:
         updated = False
+        triggered_by = []
 
-        updated |= self.normal.update_status()
-        updated |= self.standby.update_status()
+        upd1, trb1 = self.normal.update_status()
+        updated |= upd1
+        triggered_by.extend(trb1)
 
-        return updated
+        upd2, trb2 = self.standby.update_status()
+        updated |= upd2
+        triggered_by.extend(trb2)
+
+        if updated:
+            triggered_by.append(self.name)
+        return (updated, triggered_by)
 
     def text_status(self) -> list[tuple[str, str]]:
         enabled = []

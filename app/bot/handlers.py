@@ -71,4 +71,4 @@ async def status_cmd(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> Non
         logger.error("bot_status_cmd with message None")
         return
 
-    await update.message.reply_text(Status().generate_status_msg(), parse_mode=ParseMode.MARKDOWN_V2)
+    await update.message.reply_text(Status().generate_status_msg(["bot_status_cmd"]), parse_mode=ParseMode.MARKDOWN_V2)
