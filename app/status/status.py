@@ -146,12 +146,12 @@ class Status(metaclass=SingletonMeta):
             logger.error("Cannot create ats status, status2 is not defined.")
             return None
 
-        status1 = self._create_status(status1_content)
+        status1 = self._create_gpio_status(status1_content)
         if status1 is None:
             logger.error("Cannot create status1, ats status is invalid.")
             return None
 
-        status2 = self._create_status(status2_content)
+        status2 = self._create_gpio_status(status2_content)
         if status2 is None:
             logger.error("Cannot create status2, ats status is invalid.")
             return None
