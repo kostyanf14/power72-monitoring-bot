@@ -40,23 +40,28 @@ class JSONStatus:
     def _percent_changed(self, j_field: JSONField) -> bool:
         if j_field.report_on_change_value is not None:
             if abs(self._percent(j_field) - self.last_reported_value[j_field.name]) >= j_field.report_on_change_value:
+                if not j_field.report_on_change:
+                    logger.debug("Field %s value %s changed percent to %s but not reported",
+                                 j_field.name, j_field.value, self._percent(j_field))
+                    return False
+
                 logger.debug("Field %s value %s changed percent to %s and reported",
                              j_field.name, j_field.value, self._percent(j_field))
                 self.last_reported_value[j_field.name] = self._percent(j_field)
                 return True
-
-            logger.debug("Field %s value %s changed percent to %s but not reported",
-                         j_field.name, j_field.value, self._percent(j_field))
             return False
 
         if abs(self._percent(j_field) - self.last_reported_value[j_field.name]) >= 0.1:
+            if not j_field.report_on_change:
+                logger.debug("Field %s value %s changed percent to %s but not reported",
+                             j_field.name, j_field.value, self._percent(j_field))
+                return False
+
             logger.debug("Field %s value %s changed percent to %s and reported",
                          j_field.name, j_field.value, self._percent(j_field))
             self.last_reported_value[j_field.name] = self._percent(j_field)
             return True
 
-        logger.debug("Field %s value %s changed percent to %s but not reported",
-                     j_field.name, j_field.value, self._percent(j_field))
         return False
 
     def _value_changed(self, j_field: JSONField) -> bool:
